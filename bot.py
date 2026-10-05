@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import sqlite3
 import threading
@@ -13,7 +13,7 @@ bot = telebot.TeleBot(TOKEN)
 # Sening Telegram Admin ID raqaming
 ADMIN_ID = 6766950408
 
-# Railway Volume papkasi (agar local ishlatayotgan bo'lsangiz shunchaki 'database.db' bo'ladi)
+# Railway Volume papkasi
 DB_DIR = "/app/data"
 if not os.path.exists(DB_DIR):
   os.makedirs(DB_DIR, exist_ok=True)
@@ -46,6 +46,11 @@ def init_db():
 init_db()
 
 
+# To'g'ri O'zbekiston vaqtini olish funksiyasi (+5 soat)
+def get_uzbekistan_time():
+  return datetime.utcnow() + timedelta(hours=5)
+
+
 # 1 oydan keyingi sanani hisoblaydigan yordamchi funksiya
 def add_one_month(dt):
   month = dt.month + 1
@@ -59,20 +64,35 @@ def add_one_month(dt):
   return dt.replace(year=year, month=month, day=day)
 
 
-# Ro'yxatdan o'tish jarayoni (Tug'ilgan sana bilan)
+# /start bosganda pastda "Mening hisobim" tugmasi chiqadi
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-  msg = bot.send_message(message.chat.id, "Assalomu alaykum! Ismingizni kiriting:")
+  markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+  markup.add(types.KeyboardButton("👤 Mening hisobim"))
+
+  msg = bot.send_message(
+      message.chat.id,
+      "Assalomu alaykum! Ismingizni kiriting:",
+      reply_markup=markup,
+  )
   bot.register_next_step_handler(msg, process_first_name)
 
 
 def process_first_name(message):
+  if message.text == "👤 Mening hisobim":
+    show_my_account(message)
+    return
+
   first_name = message.text
   msg = bot.send_message(message.chat.id, "Familiyangizni kiriting:")
   bot.register_next_step_handler(msg, process_last_name, first_name)
 
 
 def process_last_name(message, first_name):
+  if message.text == "👤 Mening hisobim":
+    show_my_account(message)
+    return
+
   last_name = message.text
   markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
   btn = types.KeyboardButton("📞 Telefon raqamni yuborish", request_contact=True)
@@ -87,6 +107,9 @@ def process_phone(message, first_name, last_name):
   if message.contact:
     phone = message.contact.phone_number
   else:
+    if message.text == "👤 Mening hisobim":
+      show_my_account(message)
+      return
     phone = message.text
 
   msg = bot.send_message(
@@ -98,6 +121,10 @@ def process_phone(message, first_name, last_name):
 
 
 def process_birth_date(message, first_name, last_name, phone):
+  if message.text == "👤 Mening hisobim":
+    show_my_account(message)
+    return
+
   birth_date = message.text
   tg_id = message.from_user.id
 
@@ -113,13 +140,61 @@ def process_birth_date(message, first_name, last_name, phone):
   conn.commit()
   conn.close()
 
-  bot.send_message(message.chat.id, "Tabriklayman, siz muvaffaqiyatli ro'yxatdan o'tdingiz! ✅")
+  markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+  markup.add(types.KeyboardButton("👤 Mening hisobim"))
+
+  bot.send_message(
+      message.chat.id,
+      "Tabriklayman, siz muvaffaqiyatli ro'yxatdan o'tdingiz! ✅",
+      reply_markup=markup,
+  )
 
 
-# Admin buyrug'i (Faqat sizga ishlaydi)
+# Klient "Mening hisobim" tugmasini bosganda ma'lumotlari chiqadi
+@bot.message_handler(func=lambda message: message.text == "👤 Mening hisobim")
+def show_my_account(message):
+  tg_id = message.from_user.id
+
+  conn = sqlite3.connect(DB_PATH)
+  cursor = conn.cursor()
+  cursor.execute(
+      """SELECT first_name, last_name, phone, birth_date, payment_status, payment_amount, next_payment_date 
+                   FROM users WHERE tg_id = ?""",
+      (tg_id,),
+  )
+  user = cursor.fetchone()
+  conn.close()
+
+  markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+  markup.add(types.KeyboardButton("👤 Mening hisobim"))
+
+  if not user:
+    bot.send_message(
+        message.chat.id,
+        "Siz hali ro'yxatdan o'tmagansiz. Iltimos, /start buyrug'ini bosing.",
+        reply_markup=markup,
+    )
+    return
+
+  fname, lname, phone, birth_date, status, amount, next_date = user
+  next_date_str = next_date if next_date else "Belgilanmagan"
+
+  text = (
+      f"👤 **Sizning ma'lumotlaringiz:**\n\n"
+      f"F.I.O: {fname} {lname}\n"
+      f"📞 Raqam: {phone}\n"
+      f"🎂 Tug'ilgan sana: {birth_date}\n"
+      f"💳 To'lov holati: {status}\n"
+      f"💰 Oxirgi to'lov summasi: {amount} so'm\n"
+      f"⏳ Keyingi to'lov sanasi: {next_date_str}"
+  )
+
+  bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
+
+
+# Admin buyrug'i
 @bot.message_handler(commands=['admin'])
 def admin_panel(message):
-  # Faqat admin kirishi uchun tekshiruv
   if message.from_user.id != ADMIN_ID:
     bot.send_message(
         message.chat.id, "Kechirasiz, bu buyruq faqat admin uchun! ❌"
@@ -128,14 +203,12 @@ def admin_panel(message):
 
   conn = sqlite3.connect(DB_PATH)
   cursor = conn.cursor()
-  # birth_date bazadan so'ralmoqda
   cursor.execute(
       "SELECT tg_id, first_name, last_name, phone, birth_date, payment_status,"
       " payment_amount FROM users"
   )
   users = cursor.fetchall()
 
-  # Yillik statistikani hisoblash (Jami tushgan summa)
   cursor.execute("SELECT SUM(payment_amount) FROM users")
   total_yearly_amount = cursor.fetchone()[0] or 0
   conn.close()
@@ -150,7 +223,6 @@ def admin_panel(message):
 
   for u in users:
     tg_id, fname, lname, phone, birth_date, status, amount = u
-    # Tug'ilgan sana matnga qo'shildi
     text = f"👤 Mijoz: {fname} {lname}\n📞 Raqam: {phone}\n🎂 Tug'ilgan sana: {birth_date}\n💳 Holat: {status}\n💰 Summa: {amount} so'm"
 
     markup = types.InlineKeyboardMarkup()
@@ -185,7 +257,8 @@ def process_payment_amount(message, tg_id, message_id):
   tg_id = int(tg_id)
   new_status = "To'langan ✅"
 
-  hozirgi_vaqt_dt = datetime.now()
+  # O'zbekiston vaqti ishlatilmoqda
+  hozirgi_vaqt_dt = get_uzbekistan_time()
   hozirgi_vaqt = hozirgi_vaqt_dt.strftime("%Y-%m-%d %H:%M")
 
   keyingi_oy_dt = add_one_month(hozirgi_vaqt_dt)
@@ -237,7 +310,7 @@ def process_payment_amount(message, tg_id, message_id):
     pass
 
 
-# Mijozni bazadan o'chirish (Admin uchun)
+# Mijozni bazadan o'chirish
 @bot.callback_query_handler(func=lambda call: call.data.startswith('delete_user_'))
 def delete_user(call):
   if call.from_user.id != ADMIN_ID:
