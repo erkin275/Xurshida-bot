@@ -11,7 +11,7 @@ TOKEN = "8707409506:AAFLj7L9Po8s9FecWs2Z3AYRwoHg7dIsBDE"
 bot = telebot.TeleBot(TOKEN)
 
 # Sening Telegram Admin ID raqaming
-ADMIN_ID = 6766950408  # <-- Agar ID raqaming boshqacha bo'lsa, shu yerdagi raqamni o'zgartirasan
+ADMIN_ID = 6766950408
 
 # Railway Volume papkasi (agar local ishlatayotgan bo'lsangiz shunchaki 'database.db' bo'ladi)
 DB_DIR = "/app/data"
@@ -128,8 +128,10 @@ def admin_panel(message):
 
   conn = sqlite3.connect(DB_PATH)
   cursor = conn.cursor()
+  # birth_date bazadan so'ralmoqda
   cursor.execute(
-      "SELECT tg_id, first_name, last_name, phone, payment_status, payment_amount FROM users"
+      "SELECT tg_id, first_name, last_name, phone, birth_date, payment_status,"
+      " payment_amount FROM users"
   )
   users = cursor.fetchall()
 
@@ -147,8 +149,9 @@ def admin_panel(message):
     return
 
   for u in users:
-    tg_id, fname, lname, phone, status, amount = u
-    text = f"👤 Mijoz: {fname} {lname}\n📞 Raqam: {phone}\n💳 Holat: {status}\n💰 Summa: {amount} so'm"
+    tg_id, fname, lname, phone, birth_date, status, amount = u
+    # Tug'ilgan sana matnga qo'shildi
+    text = f"👤 Mijoz: {fname} {lname}\n📞 Raqam: {phone}\n🎂 Tug'ilgan sana: {birth_date}\n💳 Holat: {status}\n💰 Summa: {amount} so'm"
 
     markup = types.InlineKeyboardMarkup()
     btn_pay = types.InlineKeyboardButton("✅ To'lov qilish", callback_data=f"ask_amount_{tg_id}")
@@ -197,13 +200,18 @@ def process_payment_amount(message, tg_id, message_id):
   )
   conn.commit()
 
-  cursor.execute("SELECT first_name, last_name, phone FROM users WHERE tg_id = ?", (tg_id,))
+  cursor.execute(
+      "SELECT first_name, last_name, phone, birth_date FROM users WHERE tg_id ="
+      " ?",
+      (tg_id,),
+  )
   user = cursor.fetchone()
   name = f"{user[0]} {user[1]}"
   phone = user[2]
+  birth_date = user[3]
   conn.close()
 
-  new_text = f"👤 Mijoz: {name}\n📞 Raqam: {phone}\n💳 Holat: {new_status}\n💰 Summa: {amount} so'm\n🗓 To'lov qilingan sana: {hozirgi_vaqt}\n⏳ Keyingi to'lov sanasi: {keyingi_vaqt}"
+  new_text = f"👤 Mijoz: {name}\n📞 Raqam: {phone}\n🎂 Tug'ilgan sana: {birth_date}\n💳 Holat: {new_status}\n💰 Summa: {amount} so'm\n🗓 To'lov qilingan sana: {hozirgi_vaqt}\n⏳ Keyingi to'lov sanasi: {keyingi_vaqt}"
 
   markup = types.InlineKeyboardMarkup()
   btn = types.InlineKeyboardButton("❌ To'lanmagan qilish", callback_data=f"unpay_{tg_id}")
@@ -269,13 +277,18 @@ def cancel_payment(call):
   )
   conn.commit()
 
-  cursor.execute("SELECT first_name, last_name, phone FROM users WHERE tg_id = ?", (tg_id,))
+  cursor.execute(
+      "SELECT first_name, last_name, phone, birth_date FROM users WHERE tg_id ="
+      " ?",
+      (tg_id,),
+  )
   user = cursor.fetchone()
   name = f"{user[0]} {user[1]}"
   phone = user[2]
+  birth_date = user[3]
   conn.close()
 
-  new_text = f"👤 Mijoz: {name}\n📞 Raqam: {phone}\n💳 Holat: {new_status}"
+  new_text = f"👤 Mijoz: {name}\n📞 Raqam: {phone}\n🎂 Tug'ilgan sana: {birth_date}\n💳 Holat: {new_status}"
 
   markup = types.InlineKeyboardMarkup()
   btn = types.InlineKeyboardButton("✅ To'lov qilish", callback_data=f"ask_amount_{tg_id}")
