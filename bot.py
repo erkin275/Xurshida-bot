@@ -7,7 +7,7 @@ import telebot
 from telebot import types
 
 # Bot tokeningiz
-TOKEN = "8707409506:AAEj8ZVSuzgkTusgilaVDXTz__U8zVFG4kk"
+TOKEN = "8707409506:AAFLj7L9Po8s9FecWs2Z3AYRwoHg7dIsBDE"
 bot = telebot.TeleBot(TOKEN)
 
 # Sening Telegram Admin ID raqaming
