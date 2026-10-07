@@ -1,12 +1,14 @@
+
 from datetime import datetime, timedelta
 import os
 import sqlite3
 import threading
+import time  # Xatolikdan keyin biroz kutish uchun time moduli qo'shildi
 from flask import Flask
 import telebot
 from telebot import types
 
-# Bot tokeningiz
+# Bot tokeningiz (Maslahat: tokeningizni ommaviy joylarda hech qachon ko'rsatmang)
 TOKEN = "8707409506:AAFLj7L9Po8s9FecWs2Z3AYRwoHg7dIsBDE"
 bot = telebot.TeleBot(TOKEN)
 
@@ -404,4 +406,12 @@ def run_web():
 if __name__ == "__main__":
   t = threading.Thread(target=run_web)
   t.start()
-  bot.polling(none_stop=True)
+  
+  # Asosiy xatolikni to'g'rilash qismi: Loop yordamida uzilishlarning oldi olindi
+  while True:
+      try:
+          # timeout va request_timeout vaqtlarini oshirib, exception blockka o'radik
+          bot.polling(none_stop=True, timeout=60, request_timeout=60)
+      except Exception as e:
+          print(f"Xatolik yoki internet uzilishi yuz berdi: {e}")
+          time.sleep(3) # 3 soniya kutib yana qaytadan ulanishga harakat qiladi
