@@ -403,15 +403,3 @@ def run_web():
   app.run(host="0.0.0.0", port=port)
 
 
-if __name__ == "__main__":
-  t = threading.Thread(target=run_web)
-  t.start()
-  
-  # Asosiy xatolikni to'g'rilash qismi: Loop yordamida uzilishlarning oldi olindi
-  while True:
-      try:
-          # timeout va request_timeout vaqtlarini oshirib, exception blockka o'radik
-          bot.polling(none_stop=True, timeout=60, request_timeout=60)
-      except Exception as e:
-          print(f"Xatolik yoki internet uzilishi yuz berdi: {e}")
-          time.sleep(3) # 3 soniya kutib yana qaytadan ulanishga harakat qiladi
