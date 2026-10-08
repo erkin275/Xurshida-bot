@@ -9,7 +9,7 @@ import telebot
 from telebot import types
 
 # Bot tokeningiz (Maslahat: tokeningizni ommaviy joylarda hech qachon ko'rsatmang)
-TOKEN = "8707409506:AAG0I_sHrF1QI2jdWI-QEl1VEx1DyYaxfmo"
+TOKEN = "8707409506:AAEvbRHNVORsoMQf2vckxk0CcYkUcsrb65s"
 bot = telebot.TeleBot(TOKEN)
 
 # Sening Telegram Admin ID raqaming
